@@ -34,15 +34,16 @@
 <script>
 // data source: http://chart.finance.yahoo.com/table.csv?s=GOOG&g=w
 
+// These are actually .csv files, but github pages only gzips JSON...
 var stockSources = [
-  {symbol: "DJI" ,name: "Dow Jones Industrial Average", file: "stocks/DJI.csv"},
-  {symbol: "IXIC" ,name: "NASDAQ Composite", file: "stocks/IXIC.csv"}, 
-  {symbol: "GSPC" ,name: "S&P 500", file: "stocks/GSPC.csv"}, 
-  {symbol: "AAPL" ,name: "Apple Computers", file: "stocks/AAPL.csv"}, 
-  {symbol: "AMD" ,name: "Advanced Micro Devices, Inc", file: "stocks/AMD.csv"}, 
-  {symbol: "GOOG" ,name: "Alphabet Inc", file: "stocks/GOOG.csv"}, 
-  {symbol: "MSFT" ,name: "Microsoft Corporation", file: "stocks/MSFT.csv"}, 
-  {symbol: "ORCL" ,name: "Oracle Corporation", file: "stocks/ORCL.csv"}
+  {symbol: "DJI" ,name: "Dow Jones Industrial Average", file: "stocks/DJI.json"},
+  {symbol: "IXIC" ,name: "NASDAQ Composite", file: "stocks/IXIC.json"}, 
+  {symbol: "GSPC" ,name: "S&P 500", file: "stocks/GSPC.json"}, 
+  {symbol: "AAPL" ,name: "Apple Computers", file: "stocks/AAPL.json"}, 
+  {symbol: "AMD" ,name: "Advanced Micro Devices, Inc", file: "stocks/AMD.json"}, 
+  {symbol: "GOOG" ,name: "Alphabet Inc", file: "stocks/GOOG.json"}, 
+  {symbol: "MSFT" ,name: "Microsoft Corporation", file: "stocks/MSFT.json"}, 
+  {symbol: "ORCL" ,name: "Oracle Corporation", file: "stocks/ORCL.json"}
 ] 
 
 d3.select("#stock-select").selectAll("option")
@@ -146,7 +147,7 @@ svg.append("text")
     .attr("class", "info")
     .attr("y", 340);
 
-new Stock("AAPL", "Apple Computers", "stocks/aapl.csv", "sine", "green")
+new Stock("AAPL", "Apple Computers", "stocks/aapl.json", "sine", "green")
 
 
 function buttonClicked() {
