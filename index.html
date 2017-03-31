@@ -175,13 +175,6 @@ function Stock(symbol, name, file, waveform, color) {
 
   var thisStock = this;
 
-  d3.selectAll(".chart").append("path")
-      .datum(this)
-      .attr("id", symbol)
-      .attr("class", "chartpath")
-      .style("fill", "none")
-      .style("stroke", color);
-
   svg.append("text")
       .datum(symbol)
       .attr("class", "stockValue")
@@ -200,13 +193,19 @@ function Stock(symbol, name, file, waveform, color) {
 
   d3.csv(file, function(data) { 
     console.log(data)
-
     thisStock.data = data.reverse().map(function(d) {
       return {
         date: d3.timeParse("%Y-%m-%d")(d.Date),
         close: +d["Adj Close"]
       }
     });
+
+  d3.selectAll(".chart").append("path")
+      .datum(thisStock)
+      .attr("id", symbol)
+      .attr("class", "chartpath")
+      .style("fill", "none")
+      .style("stroke", color);
 
     updateRangeChart();
   })
