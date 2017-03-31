@@ -199,6 +199,8 @@ function Stock(symbol, name, file, waveform, color) {
       .style("visibility", "hidden");
 
   d3.csv(file, function(data) { 
+    console.log(data)
+
     thisStock.data = data.reverse().map(function(d) {
       return {
         date: d3.timeParse("%Y-%m-%d")(d.Date),
