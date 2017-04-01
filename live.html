@@ -112,9 +112,12 @@ mainChart.append("rect")
     .attr("id", "mouse-sensor")
     .attr("width", width)
     .attr("height", 300)
-    .on("mouseover touchstart", mouseOver)
-    .on("mousemove touchmove", mouseMoved)
-    .on("mouseout touchend", mouseOut);
+    .on("mouseover", mouseOver)
+    .on("touchstart", mouseOver)
+    .on("mouseout", mouseOut)
+    .on("mousemove", mouseMoved)
+    .on("touchmove", mouseMoved)
+    .on("touchend", mouseOut);
 
 var xAxisMain = mainChart.append("g")
     .attr("transform", "translate(0, 300)")
@@ -323,7 +326,7 @@ function mouseOver() {
 }
 
 function mouseMoved(MouseX) {
-  MouseX = MouseX ? MouseX : d3.event.x - margin*2;
+  MouseX = MouseX ? MouseX : d3.event.pageX - margin*2;
 
   var posX = d3.timeMonday(mainX.invert(MouseX))
 
@@ -349,6 +352,8 @@ function mouseMoved(MouseX) {
           .attr("cx", mainX(posX))
           .attr("cy", mainY(thisDate.close))
 
+    for (d of allStocks) if (d.oscillator.noteOn) d.oscillator.noteOn(0);
+    gainNode.gain.value = 1;
       p.oscillator.frequency.value = fScale(thisDate.close);
 
     } else if (!p.rangedData.length ||
