@@ -1,0 +1,405 @@
+
+<!DOCTYPE html>
+<html>
+<style>
+    body {
+      margin: 0; 
+      overflow:hidden;
+    }
+    #dateline {
+      stroke: black;
+      visibility: hidden;
+    }
+    #mouse-sensor {
+      fill-opacity: 0;
+      stroke: black;
+      stroke-width: .25;
+    }
+</style>
+<script src="//d3js.org/d3.v4.min.js"></script>
+<div style="margin-top: 10px; margin-left: 25px">
+  New Stock: <select id="stock-select"></select> 
+  Color: <select id="color-select""></select>
+  Sound waveshape: <select id="wave-select">
+    <option value="sine">Sine</option>
+    <option value="square">Square</option>
+    <option value="sawtooth">Sawtooth</option>
+    <option value="triangle">Triangle</option>
+  </select>
+  <button onclick="buttonClicked()">Add</button>
+  <button id="play-button">Play</button>
+</div>
+<div>
+  <svg style="border-color: black"></svg>
+</div>
+<script>
+// data source: http://chart.finance.yahoo.com/table.csv?s=GOOG&g=w
+
+var stockSources = ["^DJI", "^IXIC", "^GSPC", "AAPL",  "AMD",  "GOOG",  "MSFT",  "ORCL", "Other"] 
+
+var stockSelect = d3.select("#stock-select")
+    .on("change", function() {
+      if (this.value === "Other") {
+        var newOption = prompt("Enter a new ticker symbol").toUpperCase()
+        
+        d3.select(this).append("option")
+            .datum(newOption)
+            .attr("id", function(d) {return d})
+            .html(function(d) {return d})
+
+        this.value=newOption;
+      }
+    })
+
+stockSelect.selectAll("option")
+    .data(stockSources)
+  .enter().append("option")
+    .attr("id", function(d) {return d.replace(/\^/g, '')})
+    .html(function(d) {return d})
+
+var colorSelect = d3.select("#color-select")
+
+colorSelect.selectAll("option")
+    .data(["Navy", "Blue", "Aqua", "Teal", "Olive", "Green", 
+          "Orange", "Red", "Maroon", "Fuchsia", "Purple", "Black"])
+  .enter().append("option")
+    .each(function(d) {
+      d3.select(this)
+          .attr("value", d)
+          .attr("id", d)
+          .text(d)
+          .style("color", d)
+    })
+
+colorSelect.style("color", function() {return this.value})
+    .on("change", function() {
+      d3.select(this).style("color", this.value)
+    })
+
+d3.select("#play-button").on("click", play)
+
+var audioCtx = new (window.AudioContext || window.webkitAudioContext)(),
+    gainNode = audioCtx.createGain();
+
+gainNode.connect(audioCtx.destination);
+gainNode.gain.value = -1
+
+var width = 900,
+    height = 500,
+    margin = 25;
+
+var t; // to be used as a timer for the play function;
+
+var rangeX = d3.scaleTime().range([0, width - 1]),
+    rangeY = d3.scaleLinear().range([300, 0]);
+
+var mainX = d3.scaleTime().range([0, width - 1]),
+    mainY = d3.scaleLinear().range([300, 0]),
+    fScale = d3.scaleLinear().range([200, 2000]);
+
+var allStocks = [];
+
+var svg = d3.select("svg")
+    .attr("width", width + margin*2)
+    .attr("height", height + margin)
+  .append("g")
+    .attr("transform", "translate(" + (margin*2) + ", " + margin + ")")
+
+var mainChart = svg.append("g")
+    .attr("class", "chart");
+
+mainChart.append("rect")
+    .attr("id", "mouse-sensor")
+    .attr("width", width)
+    .attr("height", 300)
+    .on("mouseover touchstart", mouseOver)
+    .on("mousemove touchmove", mouseMoved)
+    .on("mouseout touchend", mouseOut);
+
+var xAxisMain = mainChart.append("g")
+    .attr("transform", "translate(0, 300)")
+
+var yAxisMain = mainChart.append("g")
+    .attr("transform", "translate(0, 0)")
+
+var rangeChart = svg.append("g")
+    .attr("class", "chart")
+    .attr("width", width)
+    .attr("height", 100)
+    .attr("transform", "translate(0,350)");
+
+var brush = d3.brushX()
+    .extent([[0, 0], [width, 50]])
+    .on("start", brushStarted)
+    .on("brush", brushed)
+    .on("end", brushEnded)
+
+rangeChart.append("g")
+    .attr("class", "brush")
+    .call(brush);
+
+var xAxisRange = rangeChart.append("g")
+    .attr("transform", "translate(0, 50)")
+
+svg.append("line")
+    .attr("id", "dateline")
+    .attr("class", "info")
+    .style("stroke-dasharray", [5, 5])
+    .attr("y1", 0)
+    .attr("y2", 330);
+
+svg.append("text")
+    .attr("class", "info")
+    .attr("y", 340);
+
+new Stock("AAPL", "sine", "green")
+
+
+function buttonClicked() {
+  var symbol = stockSelect.property("value")
+  var color = d3.select("#color-select").node().value;
+  var wave = d3.select("#wave-select").node().value;
+  
+  new Stock(symbol, wave, color)
+}
+
+function Stock(symbol, waveform, color) {
+  var cleanSymbol = symbol.replace(/\^/g, '');
+  this.symbol = cleanSymbol;
+  this.name = cleanSymbol;
+  this.data;
+  this.rangedData = [];
+  this.oscillator = new Oscillator(waveform);
+
+  d3.selectAll("option#"+cleanSymbol+", option#"+color).remove()
+
+  allStocks.push(this)
+
+  var thisStock = this;
+
+  d3.selectAll(".chart").append("path")
+      .datum(this)
+      .attr("id", cleanSymbol)
+      .attr("class", "chartpath")
+      .style("fill", "none")
+      .style("stroke", color);
+
+  svg.append("text")
+      .datum(cleanSymbol)
+      .attr("class", "stockValue")
+      .attr("id", cleanSymbol)
+      .style("fill", color)
+      .attr("transform", "translate(10, " + (allStocks.length * 20) + ")")
+      .on("mouseover", highlightPath)
+      .on("mouseout", function() {return highlightPath()});
+
+  svg.append("circle")
+      .attr("class", "info")
+      .attr("id", cleanSymbol)
+      .attr("r", 5)
+      .style("fill", color)
+      .style("visibility", "hidden");
+
+  var cors_api_url = 'https://cors-anywhere-forked.herokuapp.com/';
+
+  function doCORSRequest(options, printResult) {
+    var x = new XMLHttpRequest();
+    x.open(options.method, cors_api_url + options.url);
+    x.onload = x.onerror = function() {printResult(x.responseText)};
+    x.send(options.data);
+  }
+
+  doCORSRequest({
+    method: 'GET',
+    url: "http://chart.finance.yahoo.com/table.csv?s="+symbol+"&g=w"
+  }, function printResult(result) {
+    parsed = d3.csvParse(result).reverse()
+    thisStock.data = parsed.map(function(d) {
+      return {
+        date: d3.timeParse("%Y-%m-%d")(d.Date),
+        close: +d["Adj Close"]
+      }
+    });
+    updateRangeChart();
+  });
+}
+
+
+function Oscillator(waveform) {
+  var oscillator = audioCtx.createOscillator();
+  oscillator.connect(audioCtx.destination);
+  oscillator.connect(gainNode);
+  oscillator.frequency.value = 0;
+  oscillator.type = waveform;
+  oscillator.start(0);
+
+  return oscillator;
+} 
+
+function updateCostBasis(stockData, range) {
+  if (range) {
+    range = range.map(rangeX.invert).map(d3.timeMonday)
+    
+    stockData = stockData.filter(function(d) {
+      return range[0] <= d.date && d.date <= range[1]
+    })
+  }
+
+  return stockData.map(function(d) {
+    return {date: d.date, close: d.close/stockData[0].close}
+  })
+}
+
+function updateRangeChart() {
+  for (d of allStocks) d.rangedData = updateCostBasis(d.data)
+
+  rangeX.domain(getExtent("date"));
+  rangeY.domain([0, getExtent("close")[1]]);
+  xAxisRange.call(d3.axisBottom(rangeX))
+
+  var path = d3.line()
+      .curve(d3.curveMonotoneX)
+      .x(function(d, i) {return rangeX(d.date)})
+      .y(function(d) {return rangeY(d.close)/6})
+
+  rangeChart.selectAll(".chartpath")
+      .attr("d", function(d) {return path(d.rangedData)})
+
+  brush.move(rangeChart.select(".brush"), null)
+
+  updateMain();
+}
+
+function getExtent(field) {
+  return d3.extent(allStocks.reduce(function(a,b) {
+    return [...a,...b.rangedData.map(function(d) {return d[field]})]
+  },[]))
+}
+
+function updateMain(range) {
+  for (d of allStocks) d.rangedData = updateCostBasis(d.data, range)
+
+  mainX.domain(getExtent("date"));
+  mainY.domain(getExtent("close"));
+  fScale.domain(mainY.domain());
+
+  xAxisMain.call(d3.axisBottom(mainX))
+  yAxisMain.call(d3.axisLeft(mainY))
+
+  var rangedPath = d3.line()
+      .curve(d3.curveMonotoneX)
+      .x(function(d) {return mainX(d.date)})
+      .y(function(d) {return mainY(d.close)})
+
+  mainChart.selectAll(".chartpath")
+      .attr("d", function(d) {return rangedPath(d.rangedData)})
+}
+
+function highlightPath(d) {
+  d3.selectAll(".chartpath")
+      .style("stroke-width", function() {return d == this.id ? 2 : 1})
+}
+
+function brushStarted() {
+  d3.selectAll(".info").style("visibility", "hidden");
+};
+
+function brushEnded() {
+  var range = d3.event.selection;
+  if (!range || range[1] === range[0]) updateMain()
+};
+
+function brushed() {
+  updateMain(d3.event.selection ? d3.event.selection.map(Math.round) : null)
+}
+
+function mouseOver() {
+  if (t && t._time) t.stop();
+  if (allStocks.length > 0) {
+    d3.selectAll(".info").style("visibility", "visible");
+    for (d of allStocks) if (d.oscillator.noteOn) d.oscillator.noteOn(0);
+    gainNode.gain.value = 1;
+  }
+}
+
+function mouseMoved(MouseX) {
+  MouseX = MouseX ? MouseX : d3.event.x - margin*2;
+
+  var posX = d3.timeMonday(mainX.invert(MouseX))
+
+  d3.select("#dateline")
+      .attr("x1", mainX(posX))
+      .attr("x2", mainX(posX))
+
+  d3.select("text.info").attr("x", mainX(posX))
+      .text(d3.timeFormat("%m/%d/%Y")(posX))
+      .attr("dx", function() {return -this.getBBox().width * mainX(posX)/width})
+
+  for (p of allStocks) {
+    var thisDate = p.rangedData.filter(function(d) {
+      return d.date.toString() == posX.toString()
+    })[0]
+
+    if (thisDate) {
+      d3.select(".stockValue#"+p.symbol)
+          .text(p.name+": "+d3.format("$,.2f")(thisDate.close))
+
+      d3.select("circle#"+p.symbol)
+          .style("visibility", "visible")
+          .attr("cx", mainX(posX))
+          .attr("cy", mainY(thisDate.close))
+
+      p.oscillator.frequency.value = fScale(thisDate.close);
+
+    } else if (!p.rangedData.length ||
+                posX < p.rangedData[0].date || 
+                posX > p.rangedData[p.rangedData.length-1].date) {
+      console.log("stopping")
+
+      d3.select(".stockValue#"+p.symbol)
+          .text(p.name+": N/A")
+
+      d3.select("circle#"+p.symbol)
+          .style("visibility", "hidden")
+
+      p.oscillator.frequency.value = 0;
+    }
+  }
+}
+
+function mouseOut() {
+  for (d of allStocks) d.oscillator.frequency.value = 0;
+  gainNode.gain.value = -1
+}
+
+function play() {
+  d3.select("#play-button")
+      .text("Stop")
+      .on("click", stop);
+
+  d3.selectAll(".info")
+      .style("visibility", "visible");
+  
+  for (d of allStocks) if (d.oscillator.noteOn) d.oscillator.noteOn(0);
+  gainNode.gain.value = 1
+  
+  var maxDate = mainX(getExtent("date")[1])
+  t = d3.timer(function(elapsed) {
+    if (elapsed/5 > maxDate) {
+      stop()
+    } else {
+      mouseMoved(elapsed/5)
+    }
+  }, 1)
+}
+
+function stop() {
+  d3.select("#play-button")
+      .text("Play")
+      .on("click", play);
+
+  t.stop();
+  mouseOut();
+}
+</script>
+</html>
