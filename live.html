@@ -126,10 +126,11 @@ var yAxisMain = mainChart.append("g")
     .attr("transform", "translate(0, 0)")
 
 var rangeChart = svg.append("g")
-    .attr("class", "chart")
     .attr("width", width)
     .attr("height", 100)
     .attr("transform", "translate(0,350)");
+
+rangeChart.append("g").attr("class", "chart")
 
 var brush = d3.brushX()
     .extent([[0, 0], [width, 50]])
